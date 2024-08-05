@@ -8,3 +8,24 @@ rust.toolchain(
 use_repo(rust, "rust_toolchains")
 
 register_toolchains("@rust_toolchains//:all")
+
+crate = use_extension("@rules_rust//crate_universe:extension.bzl", "crate")
+crate.spec(
+    package = "syn",
+    version = "2.0.72",
+    features = ["full", "extra-traits"]
+)
+crate.spec(
+    package = "quote",
+    version = "1.0.36",
+)
+crate.spec(
+    package = "anyhow",
+    version = "1.0.86",
+)
+crate.spec(
+    package = "proc-macro2",
+    version = "1.0.86",
+)
+crate.from_specs()
+use_repo(crate, "crates")

@@ -1,6 +1,18 @@
-load("@rules_rust//rust:defs.bzl", "rust_binary", "rust_library")
+use rig_macros::test_suite;
 
-rust_library(
-    name = "engine_base",
-    srcs = glob(["engine_base/*.rs"]),
-)
+#[test_suite]
+pub mod suite {
+    pub fn something_other() {
+        println!("not a test");
+    }
+
+    #[case]
+    pub fn testing_1() {
+        println!("test1");
+    }
+
+    #[case]
+    pub fn testing_2() {
+        println!("test2");
+    }
+}
