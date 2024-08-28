@@ -50,7 +50,7 @@ pub enum Test {
     },
 }
 
-struct TestContext {
+struct SuiteContext {
     all: usize,
     finished: usize,
     started: bool,
@@ -59,7 +59,7 @@ struct TestContext {
     parent: Option<usize>,
 }
 
-impl TestContext {
+impl SuiteContext {
     fn new(all: usize, bar_handle: ProgressBar, parent: usize) -> Self {
         Self {
             all,
@@ -83,6 +83,12 @@ impl TestContext {
     }
 }
 
+struct TestContext {
+    name: String,
+    parent: usize,
+    bar_handle: ProgressBar,
+}
+
 enum Message {
     Started(usize),
     Success(usize),
@@ -91,8 +97,8 @@ enum Message {
 
 struct RunnerState {
     target: MultiProgress,
-    cases: Vec<(usize, ProgressBar)>,
-    suites: Vec<TestContext>,
+    cases: Vec<TestContext>,
+    suites: Vec<SuiteContext>,
     thread_pool: ThreadPool,
     queue: Vec<TestImpl>,
     receiver: Receiver<Message>,
@@ -113,7 +119,7 @@ impl RunnerState {
             sender,
         };
 
-        state.suites.push(TestContext::new_root());
+        state.suites.push(SuiteContext::new_root());
         state.add_test(test, 0, "".to_string(), "".to_string());
 
         state
@@ -132,14 +138,18 @@ impl RunnerState {
     fn join(
         receiver: Receiver<Message>,
         target: MultiProgress,
-        mut suites: Vec<TestContext>,
-        cases: Vec<(usize, ProgressBar)>,
+        mut suites: Vec<SuiteContext>,
+        cases: Vec<TestContext>,
     ) {
         while suites[0].finished < suites[0].all {
             let message = receiver.recv().unwrap();
             match message {
                 Message::Started(id) => {
-                    let (parent, bar) = &cases[id];
+                    let TestContext {
+                        parent,
+                        bar_handle: bar,
+                        ..
+                    } = &cases[id];
                     bar.set_style(TICKING_STYLE.clone());
                     let mut parent_id = Some(*parent);
 
@@ -157,7 +167,11 @@ impl RunnerState {
                     }
                 }
                 Message::Success(id) => {
-                    let (parent, bar) = &cases[id];
+                    let TestContext {
+                        parent,
+                        bar_handle: bar,
+                        ..
+                    } = &cases[id];
                     bar.finish();
                     let mut parent_id = Some(*parent);
 
@@ -175,10 +189,15 @@ impl RunnerState {
                     }
                 }
                 Message::Failure(id, reason) => {
-                    let (parent, bar) = &cases[id];
+                    let TestContext {
+                        name,
+                        parent,
+                        bar_handle: bar,
+                    } = &cases[id];
                     bar.set_style(FAILED_STYLE.clone());
-                    let mut parent_id = Some(*parent);
+                    bar.finish();
 
+                    let mut parent_id = Some(*parent);
                     while let Some(parent) = parent_id {
                         let context = &mut suites[parent];
                         if !context.failed {
@@ -207,7 +226,7 @@ impl RunnerState {
                     }
 
                     target
-                        .println(format!("\n{}", style(reason).red()))
+                        .println(format!("{}: {}\n", style(name).red(), reason))
                         .unwrap();
                 }
             }
@@ -223,7 +242,11 @@ impl RunnerState {
                 bar.set_prefix(prefix);
                 bar.set_message(name.to_owned());
                 bar.enable_steady_tick(Duration::from_millis(75));
-                self.cases.push((parent, bar));
+                self.cases.push(TestContext {
+                    name,
+                    parent,
+                    bar_handle: bar,
+                });
 
                 let sender = self.sender.clone();
 
@@ -247,7 +270,8 @@ impl RunnerState {
                 bar.enable_steady_tick(Duration::from_millis(75));
 
                 let context_id = self.suites.len();
-                self.suites.push(TestContext::new(tests.len(), bar, parent));
+                self.suites
+                    .push(SuiteContext::new(tests.len(), bar, parent));
 
                 if let Some(last) = tests.pop() {
                     for test in tests {
