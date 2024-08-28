@@ -14,9 +14,7 @@ pub fn test_suite(_params: TokenStream, body: TokenStream) -> TokenStream {
 
 fn test_suite_impl(body: TokenStream) -> anyhow::Result<proc_macro2::TokenStream> {
     let mut res: ItemMod = syn::parse(body)?;
-    let (_, items) = (&mut (res.content))
-        .as_mut()
-        .context("Module without body")?;
+    let (_, items) = (res.content).as_mut().context("Module without body")?;
 
     let mut cases = Vec::<Ident>::new();
 
@@ -46,7 +44,7 @@ fn test_suite_impl(body: TokenStream) -> anyhow::Result<proc_macro2::TokenStream
 fn is_case(attr: &Attribute) -> bool {
     match &attr.meta {
         Meta::Path(p) => match p.require_ident() {
-            Ok(i) => i.to_string() == "case",
+            Ok(i) => *i == "case",
             Err(_) => false,
         },
         _ => false,

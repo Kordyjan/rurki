@@ -7,12 +7,8 @@ pub mod suite {
     }
 
     #[case]
-    pub fn testing_1() {
-        println!("test1");
-    }
+    pub fn testing_1() {}
 
     #[case]
-    pub fn testing_2() {
-        println!("test2");
-    }
+    pub fn testing_2() {}
 }

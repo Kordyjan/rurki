@@ -17,8 +17,22 @@ rust_library(
     proc_macro_deps = [":rig_macros"],
 )
 
+rust_library(
+    name = "runner",
+    srcs = glob(["runner/*.rs"]),
+    deps = [
+        "@crates//:indicatif",
+        "@crates//:console",
+        "@crates//:rayon",
+        "@crates//:crossbeam-channel",
+    ],
+)
+
 rust_binary(
     name = "playground",
     srcs = glob(["playground/*.rs"]),
-    deps = [":rig"],
+    deps = [
+        ":rig",
+        ":runner",
+    ],
 )
