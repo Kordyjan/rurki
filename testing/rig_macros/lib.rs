@@ -2,7 +2,7 @@ use proc_macro::TokenStream;
 
 use anyhow::Context;
 use quote::quote;
-use syn::{Attribute, Ident, Item, ItemFn, ItemMod, Meta};
+use syn::{Attribute, Ident, Item, ItemMod, Meta};
 
 #[proc_macro_attribute]
 pub fn test_suite(_params: TokenStream, body: TokenStream) -> TokenStream {
@@ -28,16 +28,37 @@ fn test_suite_impl(body: TokenStream) -> anyhow::Result<proc_macro2::TokenStream
         }
     }
 
-    let new_item: ItemFn = syn::parse2(quote! {
-        pub fn run() {
-            #( #cases(); )*
-        }
-    })?;
+    let case_names = cases.iter().map(|c| c.to_string());
 
-    items.push(new_item.into());
+    let name = &res.ident;
+    let name_str = name.to_string();
+
+    let new_item = quote! {
+        pub fn run() {
+            runner::run_tests(runner::Test::Suite {
+                name: #name_str.to_string(),
+                tests: vec![
+                    #(
+                        runner::Test::Case {
+                            name: #case_names.to_string(),
+                            code: Box::new(|| {
+                                #cases();
+                                Ok(())
+                            }),
+                        }
+                    ),*
+                ],
+            });
+        }
+    };
+
+    // panic!("{}", new_item.to_string());
 
     Ok(quote! {
-        #res
+        pub mod #name {
+            #(#items)*
+            #new_item
+        }
     })
 }
 

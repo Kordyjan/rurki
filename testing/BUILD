@@ -14,6 +14,9 @@ rust_proc_macro(
 rust_library(
     name = "rig",
     srcs = glob(["rig/*.rs"]),
+    deps = [
+        ":runner",
+    ],
     proc_macro_deps = [":rig_macros"],
 )
 

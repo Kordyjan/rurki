@@ -1,14 +1,20 @@
 use rig_macros::test_suite;
 
 #[test_suite]
-pub mod suite {
-    pub fn something_other() {
+pub mod suitest {
+    use std::{thread::sleep, time::Duration};
+
+    fn something_other() {
         println!("not a test");
     }
 
     #[case]
-    pub fn testing_1() {}
+    fn testing_1() {
+        sleep(Duration::from_secs_f32(0.75))
+    }
 
     #[case]
-    pub fn testing_2() {}
+    fn testing_2() {
+        sleep(Duration::from_secs_f32(0.25))
+    }
 }
