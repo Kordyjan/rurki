@@ -1,7 +1,9 @@
+use std::collections::HashSet;
+
 use proc_macro::TokenStream;
 
 use anyhow::{bail, Context};
-use quote::quote;
+use quote::{quote, ToTokens};
 use syn::{Attribute, Ident, Item, ItemMod, Meta};
 
 #[proc_macro_attribute]
@@ -49,7 +51,27 @@ fn test_suite_impl(body: TokenStream) -> anyhow::Result<proc_macro2::TokenStream
         },
         _ => bail!("Setup argument cannot be self"),
     };
-    let case_names = cases.iter().map(|c| c.to_string());
+    let case_names = cases.iter().map(|c| c.to_string()).collect::<Vec<_>>();
+    let case_set: HashSet<String> = HashSet::from_iter(case_names.iter().cloned());
+
+    let setup_body = if let Item::Fn(setup) = setup {
+        setup.block.stmts
+    } else {
+        bail!("Setup is not a function");
+    };
+
+    for item in items.iter_mut() {
+        if let Item::Fn(fun) = item {
+            if case_set.contains(&fun.sig.ident.to_string()) {
+                let sig = &mut fun.sig;
+                sig.inputs.insert(0, input_arg.clone());
+
+                let mut tmp = setup_body.clone();
+                tmp.append(&mut fun.block.stmts);
+                fun.block.stmts = tmp;
+            }
+        }
+    }
 
     let name = &res.ident;
     let name_str = name.to_string();
@@ -62,7 +84,7 @@ fn test_suite_impl(body: TokenStream) -> anyhow::Result<proc_macro2::TokenStream
                     #(
                         runner::Test::Case {
                             name: #case_names.to_string(),
-                            code: Box::new(|#input_name| {
+                            code: Box::new(|#input_arg| {
                                 #cases(#input_name);
                                 Ok(())
                             }),
