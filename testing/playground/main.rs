@@ -1,3 +1,4 @@
 pub fn main() {
-    rig::suitest::run(0.5);
+    static TIME: f32 = 0.5;
+    rig::suitest::run(&TIME);
 }
