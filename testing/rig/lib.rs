@@ -4,17 +4,16 @@ use rig_macros::test_suite;
 pub mod suitest {
     use std::{thread::sleep, time::Duration};
 
-    fn something_other() {
-        println!("not a test");
+    #[setup]
+    fn setup(t: f32) {}
+
+    #[case]
+    fn testing_1(t: f32) {
+        sleep(Duration::from_secs_f32(t * 3.0))
     }
 
     #[case]
-    fn testing_1() {
-        sleep(Duration::from_secs_f32(0.75))
-    }
-
-    #[case]
-    fn testing_2() {
-        sleep(Duration::from_secs_f32(0.25))
+    fn testing_2(t: f32) {
+        sleep(Duration::from_secs_f32(t))
     }
 }

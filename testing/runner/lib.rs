@@ -39,14 +39,14 @@ static TICKING_STYLE: LazyLock<ProgressStyle> = LazyLock::new(|| {
         .tick_strings(&ticker_ref)
 });
 
-pub enum Test {
+pub enum Test<T> {
     Case {
         name: String,
-        code: Box<dyn Fn() -> Result + Send>,
+        code: Box<dyn Fn(T) -> Result + Send>,
     },
     Suite {
         name: String,
-        tests: Vec<Test>,
+        tests: Vec<Test<T>>,
     },
 }
 
@@ -106,7 +106,7 @@ struct RunnerState {
 }
 
 impl RunnerState {
-    fn init(test: Test) -> Self {
+    fn init<T: Copy + Send + 'static>(test: Test<T>, tested_data: T) -> Self {
         let (sender, receiver) = crossbeam_channel::unbounded::<Message>();
 
         let mut state = Self {
@@ -120,7 +120,7 @@ impl RunnerState {
         };
 
         state.suites.push(SuiteContext::new_root());
-        state.add_test(test, 0, "".to_string(), "".to_string());
+        state.add_test(test, 0, "".to_string(), "".to_string(), tested_data);
 
         state
     }
@@ -233,7 +233,14 @@ impl RunnerState {
         }
     }
 
-    fn add_test(&mut self, test: Test, parent: usize, prefix: String, child_prefix: String) {
+    fn add_test<T: Copy + Send + 'static>(
+        &mut self,
+        test: Test<T>,
+        parent: usize,
+        prefix: String,
+        child_prefix: String,
+        tested_data: T,
+    ) {
         match test {
             Test::Case { name, code } => {
                 let id = self.cases.len();
@@ -252,7 +259,7 @@ impl RunnerState {
 
                 self.queue.push(Box::new(move || {
                     sender.send(Message::Started(id)).unwrap();
-                    match code() {
+                    match code(tested_data) {
                         Ok(_) => {
                             sender.send(Message::Success(id)).unwrap();
                         }
@@ -280,6 +287,7 @@ impl RunnerState {
                             context_id,
                             format!("{}├─ ", child_prefix),
                             "│  ".to_string(),
+                            tested_data,
                         );
                     }
                     self.add_test(
@@ -287,6 +295,7 @@ impl RunnerState {
                         context_id,
                         format!("{}└─ ", child_prefix),
                         "   ".to_string(),
+                        tested_data,
                     );
                 }
             }
@@ -294,6 +303,6 @@ impl RunnerState {
     }
 }
 
-pub fn run_tests(test: Test) {
-    RunnerState::init(test).run();
+pub fn run_tests<T: Copy + Send + 'static>(test: Test<T>, tested_data: T) {
+    RunnerState::init(test, tested_data).run();
 }
