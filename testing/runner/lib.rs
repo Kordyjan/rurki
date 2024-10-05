@@ -40,16 +40,17 @@ static TICKING_STYLE: LazyLock<ProgressStyle> = LazyLock::new(|| {
 });
 
 pub enum Test<T> {
+    // Represents a single test case
     Case {
-        name: String,
-        code: Box<dyn Fn(T) -> Result + Send>,
+        name: String,                          // Name of the test case
+        code: Box<dyn Fn(T) -> Result + Send>, // Closure containing the test logic
     },
+    // Represents a group of tests (test suite)
     Suite {
-        name: String,
-        tests: Vec<Test<T>>,
+        name: String,        // Name of the test suite
+        tests: Vec<Test<T>>, // Vector of child tests (can be Cases or nested Suites)
     },
 }
-
 struct SuiteContext {
     all: usize,
     finished: usize,

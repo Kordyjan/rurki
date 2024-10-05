@@ -3,7 +3,7 @@ use std::collections::HashSet;
 use proc_macro::TokenStream;
 
 use anyhow::{bail, Context};
-use quote::{quote, ToTokens};
+use quote::quote;
 use syn::{Attribute, Ident, Item, ItemMod, Meta};
 
 #[proc_macro_attribute]
