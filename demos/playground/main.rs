@@ -1,8 +1,7 @@
-
 use std::thread;
 
-use simple_engine::SimpleEngine;
 use engine_base::{operators::input, Engine};
+use simple_engine::SimpleEngine;
 
 pub fn main() {
     let engine = SimpleEngine::new();

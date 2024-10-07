@@ -4,16 +4,13 @@ use commands::Command;
 use crossbeam_channel::{Receiver, Sender};
 use engine_base::{
     hash::Prehashed,
-    operators::{
-        types::RType,
-        InputRef, Signal, Typed,
-    },
+    operators::{types::RType, InputRef, Signal, Typed},
     Engine,
 };
 use internal::Impl;
+use std::sync::Arc;
 use transport::{Emitter, EmitterImpl, ListenerImpl};
 use typed_arena::Arena;
-use std::sync::Arc;
 
 mod commands;
 mod internal;
@@ -57,7 +54,11 @@ impl Engine for SimpleEngine {
     fn emit<T: RType>(&self, input: InputRef) -> Sender<T> {
         let (s, r) = crossbeam_channel::unbounded();
         self.sender
-            .send(Command::Emit(input, T::into_type(), Box::new(EmitterImpl::new(r))))
+            .send(Command::Emit(
+                input,
+                T::into_type(),
+                Box::new(EmitterImpl::new(r)),
+            ))
             .unwrap();
         s
     }

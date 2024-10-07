@@ -1,16 +1,14 @@
-use std::{
-    collections::VecDeque, sync::Arc
-};
+use std::{collections::VecDeque, sync::Arc};
 
 use crossbeam_channel::{Receiver, Select, SelectedOperation};
-use engine_base::
-    operators::{types::Wrapper, Desc::Input, InputRef, Typed}
-;
+use engine_base::operators::{types::Wrapper, Desc::Input, InputRef, Typed};
 use rustc_hash::FxHashMap;
 use typed_arena::Arena;
 
 use crate::{
-    commands::{Command, Update}, transport::{Emitter, Listener}, Apt
+    commands::{Command, Update},
+    transport::{Emitter, Listener},
+    Apt,
 };
 
 pub struct Impl<'a> {
@@ -60,10 +58,16 @@ impl<'a> Impl<'a> {
                         let ptr = arena.alloc(emitter);
                         self.emitters.push(&**ptr);
                         ptr.install(&mut select);
-                        let field = self.get_signal_id(Arc::new(Typed {desc: Input(iref), rtype}.into()));
+                        let field = self.get_signal_id(Arc::new(
+                            Typed {
+                                desc: Input(iref),
+                                rtype,
+                            }
+                            .into(),
+                        ));
                         self.inputs.insert(iref, field);
                         self.emitters_to_fields.push(field);
-                    },
+                    }
                     Err(_) => break,
                 }
             } else {
@@ -76,7 +80,12 @@ impl<'a> Impl<'a> {
             self.work(&mut select, receiver, &arena);
         }
     }
-    fn work(mut self, select: &'a mut Select<'a>, receiver: &'a Receiver<Command>, arena: &'a Arena<Box<dyn Emitter>>) {
+    fn work(
+        mut self,
+        select: &'a mut Select<'a>,
+        receiver: &'a Receiver<Command>,
+        arena: &'a Arena<Box<dyn Emitter>>,
+    ) {
         loop {
             let op = select.select();
             if op.index() == 0 {
@@ -94,10 +103,16 @@ impl<'a> Impl<'a> {
                         let ptr = arena.alloc(emitter);
                         self.emitters.push(&**ptr);
                         ptr.install(select);
-                        let field = self.get_signal_id(Arc::new(Typed {desc: Input(iref), rtype}.into()));
+                        let field = self.get_signal_id(Arc::new(
+                            Typed {
+                                desc: Input(iref),
+                                rtype,
+                            }
+                            .into(),
+                        ));
                         self.inputs.insert(iref, field);
                         self.emitters_to_fields.push(field);
-                    },
+                    }
                     Err(_) => break,
                 }
             } else {
@@ -117,7 +132,7 @@ impl<'a> Impl<'a> {
         let id = op.index() - 1;
         let value = self.emitters[id].receive(op).unwrap();
         let input_pos = self.emitters_to_fields[id];
-        Update {input_pos, value}
+        Update { input_pos, value }
     }
 
     fn update(&mut self, Update { input_pos, value }: Update) {
@@ -126,7 +141,6 @@ impl<'a> Impl<'a> {
             callback.accept(value).unwrap();
         }
     }
-
 
     fn add_listener(&mut self, signal: Apt, listener: Box<dyn Listener>) {
         let id = self.get_signal_id(signal);

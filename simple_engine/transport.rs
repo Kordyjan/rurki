@@ -1,4 +1,4 @@
-use crossbeam_channel::{Receiver, Select, SelectedOperation, Sender, RecvError};
+use crossbeam_channel::{Receiver, RecvError, Select, SelectedOperation, Sender};
 use engine_base::operators::types::{RType, Wrapper};
 
 #[derive(Debug)]
@@ -14,16 +14,16 @@ pub trait Listener {
 }
 
 pub struct EmitterImpl<T> {
-    receiver: Receiver<T>
+    receiver: Receiver<T>,
 }
 
-impl <T: RType> EmitterImpl<T> {
+impl<T: RType> EmitterImpl<T> {
     pub fn new(receiver: Receiver<T>) -> Self {
         EmitterImpl { receiver }
     }
 }
 
-impl <T: RType> Emitter for EmitterImpl<T> {
+impl<T: RType> Emitter for EmitterImpl<T> {
     fn install<'a>(&'a self, select: &mut Select<'a>) {
         select.recv(&self.receiver);
     }
@@ -38,16 +38,16 @@ pub struct ListenerImpl<T> {
     sender: Sender<T>,
 }
 
-impl <T: RType> ListenerImpl<T> {
+impl<T: RType> ListenerImpl<T> {
     pub fn new(sender: Sender<T>) -> Self {
-        ListenerImpl{
-            sender,
-        }
+        ListenerImpl { sender }
     }
 }
 
-impl <T: RType> Listener for ListenerImpl<T> {
+impl<T: RType> Listener for ListenerImpl<T> {
     fn accept(&self, wrapper: Wrapper) -> Result<(), ChannelClosed> {
-        self.sender.send(T::coerce(wrapper)).map_err(|_| ChannelClosed)
+        self.sender
+            .send(T::coerce(wrapper))
+            .map_err(|_| ChannelClosed)
     }
 }
