@@ -2,7 +2,11 @@ use std::{collections::VecDeque, sync::Arc};
 
 use crossbeam_channel::{Receiver, RecvError, Select, SelectedOperation};
 use crossbeam_utils::sync::Unparker;
-use engine_base::operators::{types::Wrapper, Desc::Input, InputRef, Typed};
+use engine_base::operators::{
+    types::Wrapper,
+    Desc::{Add, Input},
+    InputRef, Typed,
+};
 use rustc_hash::FxHashMap;
 use typed_arena::Arena;
 
@@ -200,6 +204,19 @@ impl<'a> Impl<'a> {
                     self.listeners.push(None);
                     let res = self.fields.len() - 1;
                     self.inputs.insert(*input, res);
+                    res
+                }
+                Add(left, right) => {
+                    let left_id = self.get_signal_id(left.clone());
+                    let right_id = self.get_signal_id(right.clone());
+                    let left = &self.fields[left_id];
+                    let right = &self.fields[right_id];
+
+                    let new = left.add(right);
+                    self.fields.push(new);
+                    self.listeners.push(None);
+                    let res = self.fields.len() - 1;
+
                     res
                 }
             };

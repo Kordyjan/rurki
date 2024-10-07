@@ -1,11 +1,14 @@
-use std::{fmt::{Debug, Formatter}, panic::UnwindSafe};
+use std::{
+    fmt::{Debug, Formatter},
+    panic::UnwindSafe,
+};
 
 use super::Result;
 
 pub enum Test<T> {
     // Represents a single test case
     Case {
-        name: String,                          // Name of the test case
+        name: String,                                       // Name of the test case
         code: Box<dyn Fn(T) -> Result + Send + UnwindSafe>, // Closure containing the test logic
     },
     // Represents a group of tests (test suite)

@@ -1,6 +1,7 @@
 use crate::hash::Prehashed;
 use std::{
     marker::PhantomData,
+    ops::Add,
     sync::{
         atomic::{AtomicU64, Ordering},
         Arc,
@@ -36,6 +37,7 @@ impl InputRef {
 #[derive(Hash, PartialEq, Eq, Clone, Debug)]
 pub enum Desc {
     Input(InputRef),
+    Add(Apt, Apt),
 }
 
 impl Desc {
@@ -69,4 +71,16 @@ pub fn input<T: RType>() -> (InputRef, Signal<T>) {
     let input_ref = InputRef::new();
     let sig = Desc::Input(input_ref).with_type::<T>().into();
     (input_ref, sig)
+}
+
+pub fn add<T, Rhs>(left: Signal<T>, right: Signal<Rhs>) -> Signal<<T as Add<Rhs>>::Output>
+where
+    T: RType,
+    Rhs: RType,
+    T: Add<Rhs>,
+    <T as Add<Rhs>>::Output: RType,
+{
+    Desc::Add(left.get_desc(), right.get_desc())
+        .with_type::<T::Output>()
+        .into()
 }

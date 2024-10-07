@@ -36,4 +36,10 @@ impl Wrapper {
             Type::U64 => Wrapper::U64(0),
         }
     }
+
+    pub fn add(&self, rhs: &Wrapper) -> Self {
+        match (self, rhs) {
+            (Wrapper::U64(lhs), Wrapper::U64(rhs)) => Wrapper::U64(lhs + rhs),
+        }
+    }
 }

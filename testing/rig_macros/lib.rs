@@ -5,7 +5,8 @@ use proc_macro::TokenStream;
 use anyhow::{bail, Context};
 use quote::quote;
 use syn::{
-    parse_quote, punctuated::Punctuated, token::Comma, Attribute, Expr, FnArg, GenericParam, Ident, Item, ItemMod, Meta, Stmt
+    parse_quote, punctuated::Punctuated, token::Comma, Attribute, Expr, FnArg, GenericParam, Ident,
+    Item, ItemMod, Meta, Stmt,
 };
 
 #[proc_macro_attribute]

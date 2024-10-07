@@ -2,7 +2,10 @@ use rig_macros::test_suite;
 
 #[test_suite]
 pub mod sanity {
-    use engine_base::{waiting::{MaybeWaiting, Waiting}, Engine};
+    use engine_base::{
+        waiting::{MaybeWaiting, Waiting},
+        Engine,
+    };
 
     #[setup]
     fn setup<T: Engine>(e: T) {

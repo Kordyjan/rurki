@@ -126,7 +126,8 @@ impl RunnerState {
         self.thread_pool.join(
             move || Self::join(self.receiver, self.target, self.suites, self.cases, timeout),
             move || {
-                let par: rayon::vec::IntoIter<Box<dyn FnOnce() + Send>> = self.queue.into_par_iter();
+                let par: rayon::vec::IntoIter<Box<dyn FnOnce() + Send>> =
+                    self.queue.into_par_iter();
                 par.for_each(|test| test());
             },
         );
@@ -311,7 +312,9 @@ impl RunnerState {
                     });
                     if let Err(e) = caught {
                         if let Some(s) = e.downcast_ref::<String>() {
-                            sender2.send(Message::Failure(id, Error::msg(s.clone()))).unwrap();
+                            sender2
+                                .send(Message::Failure(id, Error::msg(s.clone())))
+                                .unwrap();
                         } else {
                             sender2
                                 .send(Message::Failure(
@@ -319,9 +322,9 @@ impl RunnerState {
                                     Error::msg("Thread panicked with unknown error. Check stderr."),
                                 ))
                                 .unwrap();
-                                resume_unwind(e);
-                            }
-                        };
+                            resume_unwind(e);
+                        }
+                    };
                 }));
             }
             Test::Suite { name, mut tests } => {
