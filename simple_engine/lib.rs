@@ -24,6 +24,7 @@ pub struct SimpleEngine {
 }
 
 impl SimpleEngine {
+    #[must_use]
     pub fn new() -> Self {
         let (sender, receiver) = crossbeam_channel::unbounded();
         let handle = thread::spawn(move || {
@@ -37,7 +38,7 @@ impl SimpleEngine {
 
 impl Engine for SimpleEngine {
     fn start(&self) {
-        self.sender.send(Command::Start).unwrap()
+        self.sender.send(Command::Start).unwrap();
     }
 
     fn listen<T: RType>(&self, signal: Signal<T>) -> Receiver<T> {
@@ -65,6 +66,12 @@ impl Engine for SimpleEngine {
 
     fn shutdown(self) {
         self.sender.send(Command::Shutdown).unwrap();
-        self.handle.join().unwrap()
+        self.handle.join().unwrap();
+    }
+}
+
+impl Default for SimpleEngine {
+    fn default() -> Self {
+        Self::new()
     }
 }

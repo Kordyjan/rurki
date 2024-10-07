@@ -77,7 +77,7 @@ impl<'a> Impl<'a> {
         }
         if running {
             self.drain_queue();
-            self.work(&mut select, receiver, &arena);
+            self.work(&mut select, receiver, arena);
         }
     }
     fn work(
