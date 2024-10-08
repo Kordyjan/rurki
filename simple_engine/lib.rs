@@ -24,7 +24,6 @@ pub struct SimpleEngine {
 }
 
 impl SimpleEngine {
-    #[must_use]
     pub fn new() -> Self {
         let (sender, receiver) = crossbeam_channel::unbounded();
         let handle = thread::spawn(move || {
