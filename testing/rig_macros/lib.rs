@@ -44,11 +44,15 @@ fn test_suite_impl(body: TokenStream) -> anyhow::Result<proc_macro2::TokenStream
     } else {
         bail!("Setup is not a function");
     };
-    let input_name = match &input_arg {
-        syn::FnArg::Typed(pat) => match &*pat.pat {
-            syn::Pat::Ident(ident) => ident.ident.clone(),
-            _ => bail!("Setup argument must be an identifier"),
-        },
+    let (input_name, input_type) = match &input_arg {
+        syn::FnArg::Typed(pat) => {
+            let name = match &*pat.pat {
+                syn::Pat::Ident(ident) => ident.ident.clone(),
+                _ => bail!("Setup argument must be an identifier"),
+            };
+            let tpe = pat.ty.clone();
+            (name, tpe)
+        }
         _ => bail!("Setup argument cannot be self"),
     };
     let case_names = cases.iter().map(|c| c.to_string()).collect::<Vec<_>>();
@@ -76,13 +80,32 @@ fn test_suite_impl(body: TokenStream) -> anyhow::Result<proc_macro2::TokenStream
     let name = &res.ident;
     let name_str = name.to_string();
 
-    let new_item = quote! {
-        pub fn run(#input_arg) {
-            runner::run_tests(runner::Test::Suite {
+    let suite_item = quote! {
+        pub fn suite() -> runner::model::Test<#input_type> {
+            runner::model::Test::Suite {
                 name: #name_str.to_string(),
                 tests: vec![
                     #(
-                        runner::Test::Case {
+                        runner::model::Test::Case {
+                            name: #case_names.to_string(),
+                            code: Box::new(|#input_arg| {
+                                #cases(#input_name);
+                                Ok(())
+                            }),
+                        }
+                    ),*
+                ],
+            }
+        }
+    };
+
+    let run_item = quote! {
+        pub fn run(#input_arg) {
+            runner::run_tests(runner::model::Test::Suite {
+                name: #name_str.to_string(),
+                tests: vec![
+                    #(
+                        runner::model::Test::Case {
                             name: #case_names.to_string(),
                             code: Box::new(|#input_arg| {
                                 #cases(#input_name);
@@ -98,7 +121,8 @@ fn test_suite_impl(body: TokenStream) -> anyhow::Result<proc_macro2::TokenStream
     Ok(quote! {
         pub mod #name {
             #(#items)*
-            #new_item
+            #suite_item
+            #run_item
         }
     })
 }

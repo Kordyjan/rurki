@@ -4,9 +4,12 @@ use console::style;
 use crossbeam_channel::{Receiver, Sender};
 use indicatif::{MultiProgress, ProgressBar, ProgressStyle};
 
+use model::Test;
 use rayon::{ThreadPool, ThreadPoolBuilder};
 
 use rayon::prelude::*;
+
+pub mod model;
 
 pub type Result = std::result::Result<(), String>;
 
@@ -39,18 +42,6 @@ static TICKING_STYLE: LazyLock<ProgressStyle> = LazyLock::new(|| {
         .tick_strings(&ticker_ref)
 });
 
-pub enum Test<T> {
-    // Represents a single test case
-    Case {
-        name: String,                          // Name of the test case
-        code: Box<dyn Fn(T) -> Result + Send>, // Closure containing the test logic
-    },
-    // Represents a group of tests (test suite)
-    Suite {
-        name: String,        // Name of the test suite
-        tests: Vec<Test<T>>, // Vector of child tests (can be Cases or nested Suites)
-    },
-}
 struct SuiteContext {
     all: usize,
     finished: usize,
