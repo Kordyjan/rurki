@@ -6,8 +6,8 @@ pub mod suitest {
     use std::{thread::sleep, time::Duration};
 
     #[setup]
-    fn setup(t: &'static f32) {
-        let time = Duration::from_secs_f32(*t);
+    fn setup(t: f32) {
+        let time = Duration::from_secs_f32(t);
     }
 
     #[case]
@@ -26,8 +26,8 @@ pub mod suitest2 {
     use std::{thread::sleep, time::Duration};
 
     #[setup]
-    fn setup(t: &'static f32) {
-        let time = Duration::from_secs_f32(*t);
+    fn setup(t: f32) {
+        let time = Duration::from_secs_f32(t);
     }
 
     #[case]
@@ -41,7 +41,7 @@ pub mod suitest2 {
     }
 }
 
-pub fn composite() -> Test<&'static f32> {
+pub fn composite() -> Test<f32> {
     Test::Suite {
         name: "Composite".to_string(),
         tests: vec![suitest::suite(), suitest2::suite()],

@@ -4,12 +4,12 @@ use proc_macro::TokenStream;
 
 use anyhow::{bail, Context};
 use quote::quote;
-use syn::{Attribute, Ident, Item, ItemMod, Meta};
+use syn::{Attribute, FnArg, Ident, Item, ItemMod, Meta};
 
 #[proc_macro_attribute]
 pub fn test_suite(_params: TokenStream, body: TokenStream) -> TokenStream {
     match test_suite_impl(body) {
-        Err(e) => panic!("{:?}", e),
+        Err(e) => panic!("{e:?}"),
         Ok(ts) => ts.into(),
     }
 }
@@ -38,9 +38,9 @@ fn test_suite_impl(body: TokenStream) -> anyhow::Result<proc_macro2::TokenStream
     let input_arg = if let Item::Fn(setup) = &setup {
         if setup.sig.inputs.len() != 1 {
             bail!("Setup function must take exactly one argument");
-        } else {
-            setup.sig.inputs.first().unwrap().clone()
         }
+        setup.sig.inputs.first().unwrap().clone()
+
     } else {
         bail!("Setup is not a function");
     };
@@ -53,10 +53,10 @@ fn test_suite_impl(body: TokenStream) -> anyhow::Result<proc_macro2::TokenStream
             let tpe = pat.ty.clone();
             (name, tpe)
         }
-        _ => bail!("Setup argument cannot be self"),
+        FnArg::Receiver(_) => bail!("Setup argument cannot be self"),
     };
-    let case_names = cases.iter().map(|c| c.to_string()).collect::<Vec<_>>();
-    let case_set: HashSet<String> = HashSet::from_iter(case_names.iter().cloned());
+    let case_names = cases.iter().map(ToString::to_string).collect::<Vec<_>>();
+    let case_set: HashSet<String> = case_names.iter().cloned().collect();
 
     let setup_body = if let Item::Fn(setup) = setup {
         setup.block.stmts

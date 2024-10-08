@@ -149,7 +149,6 @@ impl RunnerState {
                         let context = &mut suites[parent];
                         if context.started {
                             parent_id = None;
-
                         } else {
                             if let Some(bar) = context.bar_handle.as_ref() {
                                 bar.set_style(TICKING_STYLE.clone());

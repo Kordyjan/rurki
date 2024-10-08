@@ -12,7 +12,7 @@ pub fn main() {
 
     let join_handle = thread::spawn(move || {
         let res = listener.recv().unwrap();
-        println!("Received: {:?}", res);
+        println!("Received: {res:?}");
     });
 
     thread::sleep(std::time::Duration::from_secs(1));
