@@ -34,7 +34,7 @@ static TICKING_STYLE: LazyLock<ProgressStyle> = LazyLock::new(|| {
         .chain([style("✓").green().to_string()])
         .collect();
 
-    let ticker_ref: Vec<&str> = ticker.iter().map(|t| t.as_ref()).collect();
+    let ticker_ref: Vec<&str> = ticker.iter().map(AsRef::as_ref).collect();
 
     ProgressStyle::default_spinner()
         .template("{prefix}{spinner} {msg}")
@@ -112,7 +112,7 @@ impl RunnerState {
         };
 
         state.suites.push(SuiteContext::new_root());
-        state.add_test(test, 0, "".to_string(), "".to_string(), tested_data);
+        state.add_test(test, 0, String::new(), String::new(), tested_data);
 
         state
     }
@@ -147,14 +147,15 @@ impl RunnerState {
 
                     while let Some(parent) = parent_id {
                         let context = &mut suites[parent];
-                        if !context.started {
+                        if context.started {
+                            parent_id = None;
+
+                        } else {
                             if let Some(bar) = context.bar_handle.as_ref() {
                                 bar.set_style(TICKING_STYLE.clone());
                             }
                             context.started = true;
                             parent_id = context.parent;
-                        } else {
-                            parent_id = None;
                         }
                     }
                 }
@@ -192,14 +193,14 @@ impl RunnerState {
                     let mut parent_id = Some(*parent);
                     while let Some(parent) = parent_id {
                         let context = &mut suites[parent];
-                        if !context.failed {
+                        if context.failed {
+                            parent_id = None;
+                        } else {
                             context.failed = true;
                             if let Some(bar) = context.bar_handle.as_ref() {
                                 bar.set_style(FAILED_STYLE.clone());
                             }
                             parent_id = context.parent;
-                        } else {
-                            parent_id = None;
                         }
                     }
 
@@ -239,7 +240,7 @@ impl RunnerState {
                 let bar = self.target.add(ProgressBar::new_spinner());
                 bar.set_style(WAITING_STYLE.clone());
                 bar.set_prefix(prefix);
-                bar.set_message(name.to_owned());
+                bar.set_message(name.clone());
                 bar.enable_steady_tick(Duration::from_millis(75));
                 self.cases.push(TestContext {
                     name,
@@ -252,7 +253,7 @@ impl RunnerState {
                 self.queue.push(Box::new(move || {
                     sender.send(Message::Started(id)).unwrap();
                     match code(tested_data) {
-                        Ok(_) => {
+                        Ok(()) => {
                             sender.send(Message::Success(id)).unwrap();
                         }
                         Err(e) => {
@@ -264,8 +265,8 @@ impl RunnerState {
             Test::Suite { name, mut tests } => {
                 let bar = self.target.add(ProgressBar::new_spinner());
                 bar.set_style(WAITING_STYLE.clone());
-                bar.set_prefix(prefix.to_owned());
-                bar.set_message(name.to_owned());
+                bar.set_prefix(prefix.clone());
+                bar.set_message(name.clone());
                 bar.enable_steady_tick(Duration::from_millis(75));
 
                 let context_id = self.suites.len();
@@ -277,7 +278,7 @@ impl RunnerState {
                         self.add_test(
                             test,
                             context_id,
-                            format!("{}├─ ", child_prefix),
+                            format!("{child_prefix}├─ "),
                             "│  ".to_string(),
                             tested_data,
                         );
@@ -285,7 +286,7 @@ impl RunnerState {
                     self.add_test(
                         last,
                         context_id,
-                        format!("{}└─ ", child_prefix),
+                        format!("{child_prefix}└─ "),
                         "   ".to_string(),
                         tested_data,
                     );

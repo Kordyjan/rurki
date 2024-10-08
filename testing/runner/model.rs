@@ -1,4 +1,4 @@
-use std::fmt::{write, Debug, Formatter};
+use std::fmt::{Debug, Formatter};
 
 use super::Result;
 
@@ -19,18 +19,18 @@ impl<T> Test<T> {
     fn write(&self, f: &mut Formatter, prefix: &str, child_prefix: &str) {
         match self {
             Test::Case { name, .. } => {
-                writeln!(f, "{}{}", prefix, name).unwrap();
+                writeln!(f, "{prefix}{name}").unwrap();
             }
             Test::Suite { name, tests } => {
-                writeln!(f, "{}{}", prefix, name).unwrap();
+                writeln!(f, "{prefix}{name}").unwrap();
                 if !tests.is_empty() {
                     let last_n = tests.len() - 1;
                     let last = &tests[last_n];
                     let rest = &tests[..last_n];
                     for test in rest {
-                        test.write(f, &format!("{}├─ ", child_prefix), &"│  ".to_string());
+                        test.write(f, &format!("{child_prefix}├─ "), "│  ");
                     }
-                    last.write(f, &format!("{}└─ ", child_prefix), &"   ".to_string());
+                    last.write(f, &format!("{child_prefix}└─ "), "   ");
                 }
             }
         }

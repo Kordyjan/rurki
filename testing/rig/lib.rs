@@ -1,5 +1,3 @@
-use core::time;
-
 use rig_macros::test_suite;
 use runner::model::Test;
 
@@ -14,12 +12,12 @@ pub mod suitest {
 
     #[case]
     fn testing_1() {
-        sleep(time * 2)
+        sleep(time * 2);
     }
 
     #[case]
     fn testing_2() {
-        sleep(time * 3)
+        sleep(time * 3);
     }
 }
 
@@ -34,12 +32,12 @@ pub mod suitest2 {
 
     #[case]
     fn testing_1() {
-        sleep(time * 2)
+        sleep(time * 2);
     }
 
     #[case]
     fn testing_2() {
-        sleep(time * 3)
+        sleep(time * 3);
     }
 }
 
