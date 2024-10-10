@@ -1,6 +1,6 @@
+use rig::sanity_suite::sanity;
+
 pub fn main() {
-    static TIME: f32 = 0.25;
-    rig::suitest::run(TIME);
-    let suite = rig::composite();
-    println!("{suite:?}");
+    let suite = sanity::suite();
+    runner::run_tests(suite, || 0.25);
 }

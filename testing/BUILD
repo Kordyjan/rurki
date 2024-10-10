@@ -16,6 +16,7 @@ rust_library(
     srcs = glob(["rig/*.rs"]),
     deps = [
         ":runner",
+        "//:engine_base"
     ],
     proc_macro_deps = [":rig_macros"],
 )

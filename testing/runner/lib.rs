@@ -98,7 +98,10 @@ struct RunnerState {
 }
 
 impl RunnerState {
-    fn init<T: Copy + Send + 'static>(test: Test<T>, tested_data: T) -> Self {
+    fn init<T: 'static>(
+        test: Test<T>,
+        tested_data: impl Fn() -> T + Send + Clone + 'static,
+    ) -> Self {
         let (sender, receiver) = crossbeam_channel::unbounded::<Message>();
 
         let mut state = Self {
@@ -225,13 +228,13 @@ impl RunnerState {
         }
     }
 
-    fn add_test<T: Copy + Send + 'static>(
+    fn add_test<T: 'static>(
         &mut self,
         test: Test<T>,
         parent: usize,
         prefix: String,
         child_prefix: String,
-        tested_data: T,
+        tested_data: impl Fn() -> T + Send + Clone + 'static,
     ) {
         match test {
             Test::Case { name, code } => {
@@ -249,9 +252,10 @@ impl RunnerState {
 
                 let sender = self.sender.clone();
 
+                let data = tested_data.clone();
                 self.queue.push(Box::new(move || {
                     sender.send(Message::Started(id)).unwrap();
-                    match code(tested_data) {
+                    match code(data()) {
                         Ok(()) => {
                             sender.send(Message::Success(id)).unwrap();
                         }
@@ -279,7 +283,7 @@ impl RunnerState {
                             context_id,
                             format!("{child_prefix}├─ "),
                             "│  ".to_string(),
-                            tested_data,
+                            tested_data.clone(),
                         );
                     }
                     self.add_test(
@@ -287,7 +291,7 @@ impl RunnerState {
                         context_id,
                         format!("{child_prefix}└─ "),
                         "   ".to_string(),
-                        tested_data,
+                        tested_data.clone(),
                     );
                 }
             }
@@ -295,6 +299,6 @@ impl RunnerState {
     }
 }
 
-pub fn run_tests<T: Copy + Send + 'static>(test: Test<T>, tested_data: T) {
+pub fn run_tests<T: 'static>(test: Test<T>, tested_data: impl Fn() -> T + Send + Clone + 'static) {
     RunnerState::init(test, tested_data).run();
 }

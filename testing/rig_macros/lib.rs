@@ -40,7 +40,6 @@ fn test_suite_impl(body: TokenStream) -> anyhow::Result<proc_macro2::TokenStream
             bail!("Setup function must take exactly one argument");
         }
         setup.sig.inputs.first().unwrap().clone()
-
     } else {
         bail!("Setup is not a function");
     };
@@ -99,30 +98,10 @@ fn test_suite_impl(body: TokenStream) -> anyhow::Result<proc_macro2::TokenStream
         }
     };
 
-    let run_item = quote! {
-        pub fn run(#input_arg) {
-            runner::run_tests(runner::model::Test::Suite {
-                name: #name_str.to_string(),
-                tests: vec![
-                    #(
-                        runner::model::Test::Case {
-                            name: #case_names.to_string(),
-                            code: Box::new(|#input_arg| {
-                                #cases(#input_name);
-                                Ok(())
-                            }),
-                        }
-                    ),*
-                ],
-            }, #input_name);
-        }
-    };
-
     Ok(quote! {
         pub mod #name {
             #(#items)*
             #suite_item
-            #run_item
         }
     })
 }
