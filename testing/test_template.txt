@@ -1,0 +1,4 @@
+pub fn main() {
+    let suite = {suite}();
+    runner::run_tests(suite, || {cons});
+}

@@ -1,4 +1,5 @@
 load("@rules_rust//rust:defs.bzl", "rust_binary", "rust_library", "rust_proc_macro")
+load("utils.bzl", "suite_run" )
 
 rust_proc_macro(
     name = "rig_macros",
@@ -39,4 +40,14 @@ rust_binary(
         ":rig",
         ":runner",
     ],
+)
+
+suite_run(
+    name = "sanity",
+    deps = [
+        ":rig",
+        ":runner"
+    ],
+    suite = "rig::sanity_suite::sanity::suite",
+    constructor = "std::vec![1u64, 2u64].into_iter()"
 )
