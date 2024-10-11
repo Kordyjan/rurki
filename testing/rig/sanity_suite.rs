@@ -6,8 +6,11 @@ pub mod sanity {
     use std::thread::sleep;
 
     #[setup]
-    fn setup(f: f32) {
-        let time = Duration::from_secs_f32(f);
+    fn setup<T: Iterator<Item = S>, S>(mut f: T)
+    where
+        S: Into<u64>,
+    {
+        let time = Duration::from_secs(f.next().unwrap().into());
     }
 
     #[case]

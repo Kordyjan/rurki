@@ -4,7 +4,10 @@ use proc_macro::TokenStream;
 
 use anyhow::{bail, Context};
 use quote::quote;
-use syn::{Attribute, FnArg, Ident, Item, ItemMod, Meta};
+use syn::{
+    punctuated::Punctuated, token::Comma, Attribute, FnArg, GenericParam, Ident, Item, ItemMod,
+    Meta,
+};
 
 #[proc_macro_attribute]
 pub fn test_suite(_params: TokenStream, body: TokenStream) -> TokenStream {
@@ -35,14 +38,18 @@ fn test_suite_impl(body: TokenStream) -> anyhow::Result<proc_macro2::TokenStream
     }
 
     let setup: Item = items.swap_remove(setup_id.context("No setup function found")?);
-    let input_arg = if let Item::Fn(setup) = &setup {
+
+    let (input_generics, input_arg) = if let Item::Fn(setup) = &setup {
+        let generics = setup.sig.generics.clone();
         if setup.sig.inputs.len() != 1 {
             bail!("Setup function must take exactly one argument");
         }
-        setup.sig.inputs.first().unwrap().clone()
+        let arg = setup.sig.inputs.first().unwrap().clone();
+        (generics, arg)
     } else {
         bail!("Setup is not a function");
     };
+
     let (input_name, input_type) = match &input_arg {
         syn::FnArg::Typed(pat) => {
             let name = match &*pat.pat {
@@ -68,6 +75,7 @@ fn test_suite_impl(body: TokenStream) -> anyhow::Result<proc_macro2::TokenStream
             if case_set.contains(&fun.sig.ident.to_string()) {
                 let sig = &mut fun.sig;
                 sig.inputs.insert(0, input_arg.clone());
+                sig.generics = input_generics.clone();
 
                 let mut tmp = setup_body.clone();
                 tmp.append(&mut fun.block.stmts);
@@ -78,9 +86,25 @@ fn test_suite_impl(body: TokenStream) -> anyhow::Result<proc_macro2::TokenStream
 
     let name = &res.ident;
     let name_str = name.to_string();
+    let lt = input_generics.lt_token;
+    let params = input_generics.params.clone();
+    let gt = input_generics.gt_token;
+    let where_clause = input_generics.where_clause.clone();
+
+    let params_bare = params
+        .clone()
+        .into_iter()
+        .map(|par| match par {
+            GenericParam::Type(t) => t.ident.clone(),
+            GenericParam::Lifetime(l) => l.lifetime.ident.clone(),
+            GenericParam::Const(c) => c.ident.clone(),
+        })
+        .collect::<Punctuated<_, Comma>>();
+
+    let double_colon = lt.as_ref().map(|_| quote! { :: });
 
     let suite_item = quote! {
-        pub fn suite() -> runner::model::Test<#input_type> {
+        pub fn suite #lt #params #gt () -> runner::model::Test<#input_type> #where_clause {
             runner::model::Test::Suite {
                 name: #name_str.to_string(),
                 tests: vec![
@@ -88,7 +112,7 @@ fn test_suite_impl(body: TokenStream) -> anyhow::Result<proc_macro2::TokenStream
                         runner::model::Test::Case {
                             name: #case_names.to_string(),
                             code: Box::new(|#input_arg| {
-                                #cases(#input_name);
+                                #cases #double_colon #lt #params_bare #gt (#input_name);
                                 Ok(())
                             }),
                         }
@@ -97,6 +121,8 @@ fn test_suite_impl(body: TokenStream) -> anyhow::Result<proc_macro2::TokenStream
             }
         }
     };
+
+    // bail!("{}", suite_item);
 
     Ok(quote! {
         pub mod #name {
