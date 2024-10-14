@@ -33,21 +33,15 @@ rust_library(
     ],
 )
 
-rust_binary(
-    name = "playground",
-    srcs = glob(["playground/*.rs"]),
+suite_run(
+    name = "simple_engine",
     deps = [
         ":rig",
         ":runner",
+        "//:engine_base",
+        "//:simple_engine",
     ],
-)
-
-suite_run(
-    name = "sanity",
-    deps = [
-        ":rig",
-        ":runner"
-    ],
-    suite = "rig::sanity_suite::sanity::suite",
-    constructor = "std::vec![1u64, 2u64].into_iter()"
+    suite = "rig::engine_suite",
+    constructor = "simple_engine::SimpleEngine::new()",
+    timeout = 5,
 )

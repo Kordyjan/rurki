@@ -1,7 +1,7 @@
-use std::{sync::LazyLock, time::Duration};
+use std::{process, result::Result as StdResult, sync::LazyLock, time::Duration};
 
 use console::style;
-use crossbeam_channel::{Receiver, Sender};
+use crossbeam_channel::{after, select, Receiver, Sender};
 use indicatif::{MultiProgress, ProgressBar, ProgressStyle};
 
 use model::Test;
@@ -120,9 +120,9 @@ impl RunnerState {
         state
     }
 
-    fn run(self) {
+    fn run(self, timeout: Duration) {
         self.thread_pool.join(
-            move || Self::join(self.receiver, self.target, self.suites, self.cases),
+            move || Self::join(self.receiver, self.target, self.suites, self.cases, timeout),
             move || {
                 let par: rayon::vec::IntoIter<Box<dyn Fn() + Send>> = self.queue.into_par_iter();
                 par.for_each(|test| test());
@@ -135,95 +135,138 @@ impl RunnerState {
         target: MultiProgress,
         mut suites: Vec<SuiteContext>,
         cases: Vec<TestContext>,
+        timeout: Duration,
     ) {
+        let timer = after(timeout);
         while suites[0].finished < suites[0].all {
-            let message = receiver.recv().unwrap();
-            match message {
-                Message::Started(id) => {
-                    let TestContext {
-                        parent,
-                        bar_handle: bar,
-                        ..
-                    } = &cases[id];
-                    bar.set_style(TICKING_STYLE.clone());
-                    let mut parent_id = Some(*parent);
+            let message: StdResult<Message, ()> = select! {
+                recv(receiver) -> msg => Ok(msg.unwrap()),
+                recv(timer) -> _ => Err(()),
+            };
 
-                    while let Some(parent) = parent_id {
-                        let context = &mut suites[parent];
-                        if context.started {
-                            parent_id = None;
-                        } else {
-                            if let Some(bar) = context.bar_handle.as_ref() {
-                                bar.set_style(TICKING_STYLE.clone());
-                            }
-                            context.started = true;
-                            parent_id = context.parent;
+            if let Ok(msg) = message {
+                Self::handle_join_message(msg, &mut suites, &cases, &target);
+            } else {
+                for TestContext { bar_handle, .. } in &cases {
+                    if !bar_handle.is_finished() {
+                        bar_handle.set_style(FAILED_STYLE.clone());
+                        bar_handle.finish();
+                    }
+                }
+
+                for SuiteContext {
+                    bar_handle,
+                    finished,
+                    all,
+                    ..
+                } in &mut suites
+                {
+                    *finished = *all;
+                    if let Some(bar_handle) = bar_handle {
+                        if !bar_handle.is_finished() {
+                            bar_handle.set_style(FAILED_STYLE.clone());
+                            bar_handle.finish();
                         }
                     }
                 }
-                Message::Success(id) => {
-                    let TestContext {
-                        parent,
-                        bar_handle: bar,
-                        ..
-                    } = &cases[id];
-                    bar.finish();
-                    let mut parent_id = Some(*parent);
 
-                    while let Some(parent) = parent_id {
-                        let context = &mut suites[parent];
-                        context.finished += 1;
-                        if context.finished == context.all {
-                            if let Some(bar) = context.bar_handle.as_ref() {
-                                bar.finish();
-                            }
-                            parent_id = context.parent;
-                        } else {
-                            parent_id = None;
+                eprintln!("Timeout!");
+                process::exit(1);
+            }
+        }
+    }
+
+    fn handle_join_message(
+        msg: Message,
+        suites: &mut [SuiteContext],
+        cases: &[TestContext],
+        target: &MultiProgress,
+    ) {
+        match msg {
+            Message::Started(id) => {
+                let TestContext {
+                    parent,
+                    bar_handle: bar,
+                    ..
+                } = &cases[id];
+                bar.set_style(TICKING_STYLE.clone());
+                let mut parent_id = Some(*parent);
+
+                while let Some(parent) = parent_id {
+                    let context = &mut suites[parent];
+                    if context.started {
+                        parent_id = None;
+                    } else {
+                        if let Some(bar) = context.bar_handle.as_ref() {
+                            bar.set_style(TICKING_STYLE.clone());
                         }
+                        context.started = true;
+                        parent_id = context.parent;
                     }
                 }
-                Message::Failure(id, reason) => {
-                    let TestContext {
-                        name,
-                        parent,
-                        bar_handle: bar,
-                    } = &cases[id];
-                    bar.set_style(FAILED_STYLE.clone());
-                    bar.finish();
+            }
+            Message::Success(id) => {
+                let TestContext {
+                    parent,
+                    bar_handle: bar,
+                    ..
+                } = &cases[id];
+                bar.finish();
+                let mut parent_id = Some(*parent);
 
-                    let mut parent_id = Some(*parent);
-                    while let Some(parent) = parent_id {
-                        let context = &mut suites[parent];
-                        if context.failed {
-                            parent_id = None;
-                        } else {
-                            context.failed = true;
-                            if let Some(bar) = context.bar_handle.as_ref() {
-                                bar.set_style(FAILED_STYLE.clone());
-                            }
-                            parent_id = context.parent;
+                while let Some(parent) = parent_id {
+                    let context = &mut suites[parent];
+                    context.finished += 1;
+                    if context.finished == context.all {
+                        if let Some(bar) = context.bar_handle.as_ref() {
+                            bar.finish();
                         }
+                        parent_id = context.parent;
+                    } else {
+                        parent_id = None;
                     }
-
-                    parent_id = Some(*parent);
-                    while let Some(parent) = parent_id {
-                        let context = &mut suites[parent];
-                        context.finished += 1;
-                        if context.finished == context.all {
-                            if let Some(bar) = context.bar_handle.as_ref() {
-                                bar.finish();
-                            }
-                            parent_id = context.parent;
-                        } else {
-                            parent_id = None;
-                        }
-                    }
-
-                    target
-                        .println(format!("{}: {}\n", style(name).red(), reason))
-                        .unwrap();
                 }
+            }
+            Message::Failure(id, reason) => {
+                let TestContext {
+                    name,
+                    parent,
+                    bar_handle: bar,
+                } = &cases[id];
+                bar.set_style(FAILED_STYLE.clone());
+                bar.finish();
+
+                let mut parent_id = Some(*parent);
+                while let Some(parent) = parent_id {
+                    let context = &mut suites[parent];
+                    if context.failed {
+                        parent_id = None;
+                    } else {
+                        context.failed = true;
+                        if let Some(bar) = context.bar_handle.as_ref() {
+                            bar.set_style(FAILED_STYLE.clone());
+                        }
+                        parent_id = context.parent;
+                    }
+                }
+
+                parent_id = Some(*parent);
+                while let Some(parent) = parent_id {
+                    let context = &mut suites[parent];
+                    context.finished += 1;
+                    if context.finished == context.all {
+                        if let Some(bar) = context.bar_handle.as_ref() {
+                            bar.finish();
+                        }
+                        parent_id = context.parent;
+                    } else {
+                        parent_id = None;
+                    }
+                }
+
+                target
+                    .println(format!("{}: {}\n", style(name).red(), reason))
+                    .unwrap();
             }
         }
     }
@@ -299,6 +342,10 @@ impl RunnerState {
     }
 }
 
-pub fn run_tests<T: 'static>(test: Test<T>, tested_data: impl Fn() -> T + Send + Clone + 'static) {
-    RunnerState::init(test, tested_data).run();
+pub fn run_tests<T: 'static>(
+    test: Test<T>,
+    tested_data: impl Fn() -> T + Send + Clone + 'static,
+    timeout: Duration,
+) {
+    RunnerState::init(test, tested_data).run(timeout);
 }
