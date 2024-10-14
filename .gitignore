@@ -1,3 +1,4 @@
 bazel-*
 rust-project.json
 .vscode
+debug.log

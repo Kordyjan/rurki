@@ -2,19 +2,16 @@ use rig_macros::test_suite;
 
 #[test_suite]
 pub mod sanity {
-    use core::time::Duration;
-    use std::thread::sleep;
+    use engine_base::Engine;
 
     #[setup]
-    fn setup<T: Iterator<Item = S>, S>(mut f: T)
-    where
-        S: Into<u64>,
-    {
-        let time = Duration::from_secs(f.next().unwrap().into());
+    fn setup<T: Engine>(e: T) {
+        let engine = e;
     }
 
     #[case]
-    fn testing_1() {
-        sleep(time * 2);
+    fn engine_can_be_started_and_stopped() {
+        engine.start();
+        engine.shutdown();
     }
 }
