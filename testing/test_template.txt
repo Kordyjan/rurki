@@ -1,3 +1,5 @@
+#![allow(clippy::redundant_closure)]
+
 pub fn main() {
     let suite = {suite}();
     runner::run_tests(suite, || {cons}, std::time::Duration::from_secs({timeout}));

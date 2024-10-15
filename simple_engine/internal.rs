@@ -1,6 +1,6 @@
 use std::{collections::VecDeque, sync::Arc};
 
-use crossbeam_channel::{Receiver, Select, SelectedOperation};
+use crossbeam_channel::{Receiver, RecvError, Select, SelectedOperation};
 use engine_base::operators::{types::Wrapper, Desc::Input, InputRef, Typed};
 use rustc_hash::FxHashMap;
 use typed_arena::Arena;
@@ -11,12 +11,14 @@ use crate::{
     Apt,
 };
 
+type RecvResult<T> = Result<T, RecvError>;
+
 pub struct Impl<'a> {
     fields: Vec<Wrapper>,
     listeners: Vec<Option<Box<dyn Listener>>>,
     signals: FxHashMap<Apt, usize>,
     inputs: FxHashMap<InputRef, usize>,
-    emitters: Vec<&'a dyn Emitter>,
+    emitters: Vec<Option<&'a dyn Emitter>>,
     emitters_to_fields: Vec<usize>,
     prestart_queue: VecDeque<Update>,
 }
@@ -56,7 +58,7 @@ impl<'a> Impl<'a> {
                     }
                     Ok(Command::Emit(iref, rtype, emitter)) => {
                         let ptr = arena.alloc(emitter);
-                        self.emitters.push(&**ptr);
+                        self.emitters.push(Some(&**ptr));
                         ptr.install(&mut select);
                         let field = self.get_signal_id(Arc::new(
                             Typed {
@@ -71,8 +73,13 @@ impl<'a> Impl<'a> {
                     Err(_) => break,
                 }
             } else {
-                let update = self.create_update(op);
-                self.prestart_queue.push_back(update);
+                let index = op.index();
+                if let Ok(update) = self.create_update(op) {
+                    self.prestart_queue.push_back(update);
+                } else {
+                    select.remove(index);
+                    self.emitters[index - 1] = None;
+                }
             }
         }
         if running {
@@ -101,7 +108,7 @@ impl<'a> Impl<'a> {
                     }
                     Ok(Command::Emit(iref, rtype, emitter)) => {
                         let ptr = arena.alloc(emitter);
-                        self.emitters.push(&**ptr);
+                        self.emitters.push(Some(&**ptr));
                         ptr.install(select);
                         let field = self.get_signal_id(Arc::new(
                             Typed {
@@ -116,8 +123,13 @@ impl<'a> Impl<'a> {
                     Err(_) => break,
                 }
             } else {
-                let update = self.create_update(op);
-                self.update(update);
+                let index = op.index();
+                if let Ok(update) = self.create_update(op) {
+                    self.update(update);
+                } else {
+                    select.remove(index);
+                    self.emitters[index - 1] = None;
+                }
             }
         }
     }
@@ -128,17 +140,24 @@ impl<'a> Impl<'a> {
         }
     }
 
-    fn create_update(&mut self, op: SelectedOperation) -> Update {
+    fn create_update(&mut self, op: SelectedOperation) -> RecvResult<Update> {
         let id = op.index() - 1;
-        let value = self.emitters[id].receive(op).unwrap();
+        let value = self.emitters[id]
+            .expect("Emitter already discarded")
+            .receive(op)?;
         let input_pos = self.emitters_to_fields[id];
-        Update { input_pos, value }
+        Ok(Update { input_pos, value })
     }
 
     fn update(&mut self, Update { input_pos, value }: Update) {
         self.fields[input_pos] = value.clone();
-        if let Some(callback) = self.listeners[input_pos].as_ref() {
-            callback.accept(value).unwrap();
+        let needs_removal = if let Some(callback) = self.listeners[input_pos].as_ref() {
+            !matches!(callback.accept(value), Ok(()))
+        } else {
+            false
+        };
+        if needs_removal {
+            self.listeners[input_pos] = None;
         }
     }
 

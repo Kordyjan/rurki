@@ -37,7 +37,9 @@ impl SimpleEngine {
 
 impl Engine for SimpleEngine {
     fn start(&self) {
-        self.sender.send(Command::Start).unwrap();
+        self.sender
+            .send(Command::Start)
+            .expect("Engine thread is dead");
     }
 
     fn listen<T: RType>(&self, signal: Signal<T>) -> Receiver<T> {
@@ -47,7 +49,7 @@ impl Engine for SimpleEngine {
                 signal.get_desc(),
                 Box::new(ListenerImpl::new(s)),
             ))
-            .unwrap();
+            .expect("Engine thread is dead");
         r
     }
 
@@ -59,12 +61,14 @@ impl Engine for SimpleEngine {
                 T::into_type(),
                 Box::new(EmitterImpl::new(r)),
             ))
-            .unwrap();
+            .expect("Engine thread is dead");
         s
     }
 
     fn shutdown(self) {
-        self.sender.send(Command::Shutdown).unwrap();
+        self.sender
+            .send(Command::Shutdown)
+            .expect("Engine thread is dead");
         self.handle.join().unwrap();
     }
 }
