@@ -1,5 +1,5 @@
 build:clippy --aspects=@rules_rust//rust:defs.bzl%rust_clippy_aspect
 build:clippy --output_groups=+clippy_checks
-build:clippy --@rules_rust//:clippy_flags=-Dclippy::pedantic,-Aclippy::needless-pass-by-value,-Aclippy::must_use_candidate,-Aclippy::missing_panics_doc
+build:clippy --@rules_rust//:clippy_flags=-Dclippy::pedantic,-Aclippy::needless-pass-by-value,-Aclippy::must_use_candidate,-Aclippy::missing_panics_doc,-Aclippy::module_name_repetitions
 
 build --@rules_rust//:rustc_output_diagnostics=true --output_groups=+rust_lib_rustc_output,+rust_metadata_rustc_output

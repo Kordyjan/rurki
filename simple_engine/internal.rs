@@ -1,6 +1,7 @@
 use std::{collections::VecDeque, sync::Arc};
 
 use crossbeam_channel::{Receiver, RecvError, Select, SelectedOperation};
+use crossbeam_utils::sync::Unparker;
 use engine_base::operators::{types::Wrapper, Desc::Input, InputRef, Typed};
 use rustc_hash::FxHashMap;
 use typed_arena::Arena;
@@ -40,37 +41,46 @@ impl<'a> Impl<'a> {
         let mut select = Select::new();
         select.recv(receiver);
 
-        let mut running = true;
-        loop {
+        let unparker_or_shutdown: Option<Unparker> = loop {
             let op = select.select();
             if op.index() == 0 {
                 let command = op.recv(receiver);
                 match command {
-                    Ok(Command::Start) => {
-                        break;
+                    Ok(Command::Start(unparker)) => {
+                        break Some(unparker);
                     }
                     Ok(Command::Shutdown) => {
-                        running = false;
-                        break;
+                        break None;
                     }
-                    Ok(Command::Listen(signal, listener)) => {
+                    Ok(Command::Listen {
+                        signal,
+                        listener,
+                        unparker,
+                    }) => {
                         self.add_listener(signal, listener);
+                        unparker.unpark();
                     }
-                    Ok(Command::Emit(iref, rtype, emitter)) => {
+                    Ok(Command::Emit {
+                        input,
+                        rtype,
+                        emitter,
+                        unparker,
+                    }) => {
                         let ptr = arena.alloc(emitter);
                         self.emitters.push(Some(&**ptr));
                         ptr.install(&mut select);
                         let field = self.get_signal_id(Arc::new(
                             Typed {
-                                desc: Input(iref),
+                                desc: Input(input),
                                 rtype,
                             }
                             .into(),
                         ));
-                        self.inputs.insert(iref, field);
+                        self.inputs.insert(input, field);
                         self.emitters_to_fields.push(field);
+                        unparker.unpark();
                     }
-                    Err(_) => break,
+                    Err(_) => break None,
                 }
             } else {
                 let index = op.index();
@@ -81,9 +91,10 @@ impl<'a> Impl<'a> {
                     self.emitters[index - 1] = None;
                 }
             }
-        }
-        if running {
+        };
+        if let Some(unparker) = unparker_or_shutdown {
             self.drain_queue();
+            unparker.unpark();
             self.work(&mut select, receiver, arena);
         }
     }
@@ -97,28 +108,40 @@ impl<'a> Impl<'a> {
             let op = select.select();
             if op.index() == 0 {
                 match op.recv(receiver) {
-                    Ok(Command::Start) => {
-                        panic!("Engine already started!")
+                    Ok(Command::Start(unparker)) => {
+                        unparker.unpark();
+                        eprintln!("Engine start called on running engine!");
                     }
                     Ok(Command::Shutdown) => {
                         break;
                     }
-                    Ok(Command::Listen(signal, listener)) => {
+                    Ok(Command::Listen {
+                        signal,
+                        listener,
+                        unparker,
+                    }) => {
                         self.add_listener(signal, listener);
+                        unparker.unpark();
                     }
-                    Ok(Command::Emit(iref, rtype, emitter)) => {
+                    Ok(Command::Emit {
+                        input,
+                        rtype,
+                        emitter,
+                        unparker,
+                    }) => {
                         let ptr = arena.alloc(emitter);
                         self.emitters.push(Some(&**ptr));
                         ptr.install(select);
                         let field = self.get_signal_id(Arc::new(
                             Typed {
-                                desc: Input(iref),
+                                desc: Input(input),
                                 rtype,
                             }
                             .into(),
                         ));
-                        self.inputs.insert(iref, field);
+                        self.inputs.insert(input, field);
                         self.emitters_to_fields.push(field);
+                        unparker.unpark();
                     }
                     Err(_) => break,
                 }

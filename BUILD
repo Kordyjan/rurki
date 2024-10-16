@@ -5,6 +5,7 @@ rust_library(
     srcs = glob(["engine_base/**/*.rs"]),
     deps = [
         "@crates//:crossbeam-channel",
+        "@crates//:crossbeam-utils",
         "@crates//:rustc-hash",
     ],
     visibility = ["//visibility:public"],
@@ -16,6 +17,7 @@ rust_library(
     deps = [
         ":engine_base",
         "@crates//:crossbeam-channel",
+        "@crates//:crossbeam-utils",
         "@crates//:rustc-hash",
         "@crates//:typed-arena",
     ],

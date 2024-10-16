@@ -5,6 +5,7 @@ use crossbeam_channel::{Receiver, Sender};
 use engine_base::{
     hash::Prehashed,
     operators::{types::RType, InputRef, Signal, Typed},
+    waiting::{MaybeWaiting, ParkWaiting, ThreadJoinWaiting, Waiting},
     Engine,
 };
 use internal::Impl;
@@ -36,40 +37,47 @@ impl SimpleEngine {
 }
 
 impl Engine for SimpleEngine {
-    fn start(&self) {
+    fn start(&self) -> impl MaybeWaiting<()> {
+        let (wait, unparker) = ParkWaiting::create(());
         self.sender
-            .send(Command::Start)
+            .send(Command::Start(unparker))
             .expect("Engine thread is dead");
+        wait
     }
 
-    fn listen<T: RType>(&self, signal: Signal<T>) -> Receiver<T> {
+    fn listen<T: RType>(&self, signal: Signal<T>) -> impl MaybeWaiting<Receiver<T>> {
         let (s, r) = crossbeam_channel::unbounded();
+        let (wait, unparker) = ParkWaiting::create(r);
         self.sender
-            .send(Command::Listen(
-                signal.get_desc(),
-                Box::new(ListenerImpl::new(s)),
-            ))
+            .send(Command::Listen {
+                signal: signal.get_desc(),
+                listener: Box::new(ListenerImpl::new(s)),
+                unparker,
+            })
             .expect("Engine thread is dead");
-        r
+        wait
     }
 
-    fn emit<T: RType>(&self, input: InputRef) -> Sender<T> {
+    fn emit<T: RType>(&self, input: InputRef) -> impl MaybeWaiting<Sender<T>> {
         let (s, r) = crossbeam_channel::unbounded();
+        let (wait, unparker) = ParkWaiting::create(s);
         self.sender
-            .send(Command::Emit(
+            .send(Command::Emit {
                 input,
-                T::into_type(),
-                Box::new(EmitterImpl::new(r)),
-            ))
+                rtype: T::into_type(),
+                emitter: Box::new(EmitterImpl::new(r)),
+                unparker,
+            })
             .expect("Engine thread is dead");
-        s
+        wait
     }
 
-    fn shutdown(self) {
+    fn shutdown(self) -> impl Waiting<()> {
         self.sender
             .send(Command::Shutdown)
             .expect("Engine thread is dead");
-        self.handle.join().unwrap();
+
+        ThreadJoinWaiting::from(self.handle)
     }
 }
 

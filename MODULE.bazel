@@ -32,6 +32,10 @@ crate.spec(
     version = "0.5.13",
 )
 crate.spec(
+    package = "crossbeam-utils",
+    version = "0.8.20",
+)
+crate.spec(
     package = "rayon",
     version = "1.10.0",
 )
