@@ -3,10 +3,9 @@ use std::collections::HashSet;
 use proc_macro::TokenStream;
 
 use anyhow::{bail, Context};
-use quote::quote;
+use quote::{quote, ToTokens};
 use syn::{
-    punctuated::Punctuated, token::Comma, Attribute, FnArg, GenericParam, Ident, Item, ItemMod,
-    Meta,
+    parse_quote, punctuated::Punctuated, token::Comma, Attribute, Expr, FnArg, GenericParam, Ident, Item, ItemMod, Meta, Stmt
 };
 
 #[proc_macro_attribute]
@@ -76,9 +75,14 @@ fn test_suite_impl(body: TokenStream) -> anyhow::Result<proc_macro2::TokenStream
                 let sig = &mut fun.sig;
                 sig.inputs.insert(0, input_arg.clone());
                 sig.generics = input_generics.clone();
+                sig.output = parse_quote! { -> Result<(), String> };
 
                 let mut tmp = setup_body.clone();
+                if let Some(Stmt::Expr(_, sem)) = fun.block.stmts.last_mut() {
+                    *sem = Some(parse_quote! {;});
+                }
                 tmp.append(&mut fun.block.stmts);
+                tmp.push(Stmt::Expr(Expr::Verbatim(quote! { Ok(()) }), None));
                 fun.block.stmts = tmp;
             }
         }
@@ -112,8 +116,7 @@ fn test_suite_impl(body: TokenStream) -> anyhow::Result<proc_macro2::TokenStream
                         runner::model::Test::Case {
                             name: #case_names.to_string(),
                             code: Box::new(|#input_arg| {
-                                #cases #double_colon #lt #params_bare #gt (#input_name);
-                                Ok(())
+                                #cases #double_colon #lt #params_bare #gt (#input_name)
                             }),
                         }
                     ),*
@@ -122,7 +125,7 @@ fn test_suite_impl(body: TokenStream) -> anyhow::Result<proc_macro2::TokenStream
         }
     };
 
-    // bail!("{}", suite_item);
+    // bail!("{}", items[1].to_token_stream());
 
     Ok(quote! {
         pub mod #name {
