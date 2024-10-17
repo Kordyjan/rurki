@@ -1,3 +1,4 @@
+use std::panic::{catch_unwind, resume_unwind, UnwindSafe};
 use std::{process, result::Result as StdResult, sync::LazyLock, time::Duration};
 
 use console::style;
@@ -13,7 +14,7 @@ pub mod model;
 
 pub type Result = std::result::Result<(), String>;
 
-type TestImpl = Box<dyn Fn() + 'static + Send>;
+type TestImpl = Box<dyn FnOnce() + 'static + Send>;
 
 static WAITING_STYLE: LazyLock<ProgressStyle> = LazyLock::new(|| {
     ProgressStyle::default_spinner()
@@ -100,7 +101,7 @@ struct RunnerState {
 impl RunnerState {
     fn init<T: 'static>(
         test: Test<T>,
-        tested_data: impl Fn() -> T + Send + Clone + 'static,
+        tested_data: impl Fn() -> T + Send + Clone + UnwindSafe + 'static,
     ) -> Self {
         let (sender, receiver) = crossbeam_channel::unbounded::<Message>();
 
@@ -124,7 +125,7 @@ impl RunnerState {
         self.thread_pool.join(
             move || Self::join(self.receiver, self.target, self.suites, self.cases, timeout),
             move || {
-                let par: rayon::vec::IntoIter<Box<dyn Fn() + Send>> = self.queue.into_par_iter();
+                let par: rayon::vec::IntoIter<Box<dyn FnOnce() + Send>> = self.queue.into_par_iter();
                 par.for_each(|test| test());
             },
         );
@@ -277,7 +278,7 @@ impl RunnerState {
         parent: usize,
         prefix: String,
         child_prefix: String,
-        tested_data: impl Fn() -> T + Send + Clone + 'static,
+        tested_data: impl Fn() -> T + Send + Clone + UnwindSafe + 'static,
     ) {
         match test {
             Test::Case { name, code } => {
@@ -298,14 +299,28 @@ impl RunnerState {
                 let data = tested_data.clone();
                 self.queue.push(Box::new(move || {
                     sender.send(Message::Started(id)).unwrap();
-                    match code(data()) {
+                    let sender2 = sender.clone();
+                    let caught = catch_unwind(move || match code(data()) {
                         Ok(()) => {
                             sender.send(Message::Success(id)).unwrap();
                         }
                         Err(e) => {
                             sender.send(Message::Failure(id, e)).unwrap();
                         }
-                    }
+                    });
+                    if let Err(e) = caught {
+                        if let Some(s) = e.downcast_ref::<String>() {
+                            sender2.send(Message::Failure(id, s.clone())).unwrap();
+                        } else {
+                            sender2
+                                .send(Message::Failure(
+                                    id,
+                                    format!("Thread panicked with unknown error. Check stderr."),
+                                ))
+                                .unwrap();
+                                resume_unwind(e);
+                            }
+                        };
                 }));
             }
             Test::Suite { name, mut tests } => {
@@ -344,7 +359,7 @@ impl RunnerState {
 
 pub fn run_tests<T: 'static>(
     test: Test<T>,
-    tested_data: impl Fn() -> T + Send + Clone + 'static,
+    tested_data: impl Fn() -> T + Send + Clone + UnwindSafe + 'static,
     timeout: Duration,
 ) {
     RunnerState::init(test, tested_data).run(timeout);
