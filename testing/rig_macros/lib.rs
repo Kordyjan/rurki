@@ -3,7 +3,7 @@ use std::collections::HashSet;
 use proc_macro::TokenStream;
 
 use anyhow::{bail, Context};
-use quote::{quote, ToTokens};
+use quote::quote;
 use syn::{
     parse_quote, punctuated::Punctuated, token::Comma, Attribute, Expr, FnArg, GenericParam, Ident, Item, ItemMod, Meta, Stmt
 };
@@ -75,7 +75,7 @@ fn test_suite_impl(body: TokenStream) -> anyhow::Result<proc_macro2::TokenStream
                 let sig = &mut fun.sig;
                 sig.inputs.insert(0, input_arg.clone());
                 sig.generics = input_generics.clone();
-                sig.output = parse_quote! { -> Result<(), String> };
+                sig.output = parse_quote! { -> runner::Result };
 
                 let mut tmp = setup_body.clone();
                 if let Some(Stmt::Expr(_, sem)) = fun.block.stmts.last_mut() {

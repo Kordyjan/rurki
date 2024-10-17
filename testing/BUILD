@@ -30,6 +30,7 @@ rust_library(
         "@crates//:console",
         "@crates//:rayon",
         "@crates//:crossbeam-channel",
+        "@crates//:anyhow",
     ],
 )
 

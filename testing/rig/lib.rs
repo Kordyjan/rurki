@@ -1,6 +1,7 @@
 #![allow(unused_mut)]
 #![allow(non_snake_case)]
 #![allow(clippy::module_name_repetitions)]
+#![allow(clippy::missing_errors_doc)]
 
 use engine_base::Engine;
 use runner::model::Test;

@@ -1,6 +1,7 @@
 use std::panic::{catch_unwind, resume_unwind, UnwindSafe};
 use std::{process, result::Result as StdResult, sync::LazyLock, time::Duration};
 
+use anyhow::Error;
 use console::style;
 use crossbeam_channel::{after, select, Receiver, Sender};
 use indicatif::{MultiProgress, ProgressBar, ProgressStyle};
@@ -12,7 +13,7 @@ use rayon::prelude::*;
 
 pub mod model;
 
-pub type Result = std::result::Result<(), String>;
+pub type Result = anyhow::Result<()>;
 
 type TestImpl = Box<dyn FnOnce() + 'static + Send>;
 
@@ -85,7 +86,7 @@ struct TestContext {
 enum Message {
     Started(usize),
     Success(usize),
-    Failure(usize, String),
+    Failure(usize, Error),
 }
 
 struct RunnerState {
@@ -310,12 +311,12 @@ impl RunnerState {
                     });
                     if let Err(e) = caught {
                         if let Some(s) = e.downcast_ref::<String>() {
-                            sender2.send(Message::Failure(id, s.clone())).unwrap();
+                            sender2.send(Message::Failure(id, Error::msg(s.clone()))).unwrap();
                         } else {
                             sender2
                                 .send(Message::Failure(
                                     id,
-                                    format!("Thread panicked with unknown error. Check stderr."),
+                                    Error::msg("Thread panicked with unknown error. Check stderr."),
                                 ))
                                 .unwrap();
                                 resume_unwind(e);

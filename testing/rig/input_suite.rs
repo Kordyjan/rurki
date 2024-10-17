@@ -20,17 +20,17 @@ pub mod input {
         engine.start().wait();
         let emitter = engine.emit::<u64>(input_ref).wait();
         let listener = engine.listen(signal).wait();
-        emitter.send(42);
-        assert_eq!(listener.recv().unwrap(), 42);
+        emitter.send(42)?;
+        assert_eq!(listener.recv()?, 42);
     }
 
     #[case]
     pub fn input_forwards_signal__register_before_start() {
         let emitter = engine.emit::<u64>(input_ref).wait();
         let listener = engine.listen(signal).wait();
-        emitter.send(42);
+        emitter.send(42)?;
         engine.start().immediate();
-        assert_eq!(listener.recv().unwrap(), 43);
+        assert_eq!(listener.recv()?, 42);
     }
 
     #[case]
@@ -38,8 +38,8 @@ pub mod input {
         let emitter = engine.emit::<u64>(input_ref).wait();
         engine.start().wait();
         let listener = engine.listen(signal).wait();
-        emitter.send(42);
-        assert_eq!(listener.recv().unwrap(), 42);
+        emitter.send(42)?;
+        assert_eq!(listener.recv()?, 42);
     }
 
     #[case]
@@ -47,17 +47,17 @@ pub mod input {
         engine.start().wait();
         let listener = engine.listen(signal).wait();
         let emitter = engine.emit::<u64>(input_ref).wait();
-        emitter.send(42);
-        assert_eq!(listener.recv().unwrap(), 42);
+        emitter.send(42)?;
+        assert_eq!(listener.recv()?, 42);
     }
 
     #[case]
     pub fn input_forwards_signal__reversed__register_before_start() {
         let listener = engine.listen(signal).wait();
         let emitter = engine.emit::<u64>(input_ref).wait();
-        emitter.send(42);
-        engine.start();
-        assert_eq!(listener.recv().unwrap(), 42);
+        emitter.send(42)?;
+        engine.start().immediate();
+        assert_eq!(listener.recv()?, 42);
     }
 
     #[case]
@@ -65,7 +65,7 @@ pub mod input {
         let listener = engine.listen(signal).wait();
         engine.start().wait();
         let emitter = engine.emit::<u64>(input_ref).wait();
-        emitter.send(42);
-        assert_eq!(listener.recv().unwrap(), 42);
+        emitter.send(42)?;
+        assert_eq!(listener.recv()?, 42);
     }
 }
